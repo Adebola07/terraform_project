@@ -64,6 +64,104 @@ resource "aws_subnet" "pub-subnet-2" {
     }
 }
 
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.my-vpc.id
+
+  tags = {
+    Name = var.cidr_blocks[0].name
+  }
+}
+
+resource "aws_route_table" "my-rtb" {
+  vpc_id = aws_vpc.my-vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id 
+  }
+
+  tags = {
+    Name = var.cidr_blocks[0].name
+  }
+}
+
+resource "aws_eip" "my-eip" {
+  domain   = "vpc"
+
+  tags = {
+    Name = var.cidr_blocks[0].name
+  }
+}
+
+resource "aws_nat_gateway" "my-nat" {
+  allocation_id = aws_eip.my-eip.id
+  subnet_id     = aws_subnet.pub-subnet-2.id
+
+  tags = {
+    Name = var.cidr_blocks[0].name
+  }
+
+  # To ensure proper ordering, it is recommended to add an explicit dependency
+  # on the Internet Gateway for the VPC.
+  depends_on = [aws_internet_gateway.igw]
+}
+
+resource "aws_default_route_table" "main-rtb" {
+  default_route_table_id = aws_vpc.my-vpc.default_route_table_id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.my-nat.id
+  }
+
+  tags = {
+    Name = var.cidr_blocks[0].name
+  }
+}
+
+resource "aws_route_table_association" "rtb-ass" {
+  subnet_id      = aws_subnet.pub-subnet-2.id
+  route_table_id = aws_route_table.my-rtb.id
+}
+
+resource "aws_route_table_association" "rtb-ass2" {
+  subnet_id      = aws_subnet.pub-subnet-1.id
+  route_table_id = aws_route_table.my-rtb.id
+}
+
+resource "aws_security_group" "my-sg" {
+  name        = "testing-sg"
+  description = "Allow ssh and http inbound traffic"
+  vpc_id      = aws_vpc.my-vpc.id
+
+  ingress {
+    description      = "Allow ssh"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+   ingress {
+    description      = "Open port 8080"
+    from_port        = 8080
+    to_port          = 8080
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = var.cidr_blocks[0].name
+  }
+}
+
+
 data "aws_availability_zones" "available" {
   state = "available"
 }
