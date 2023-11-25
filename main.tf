@@ -10,6 +10,8 @@ variable cidr_blocks {
     }))
 }
 
+variable keypair-path {}
+
 #variable avail_zone {
 #    description = "List of availability zones name in the region"
 #    type = list
@@ -161,9 +163,46 @@ resource "aws_security_group" "my-sg" {
   }
 }
 
+resource "aws_instance" "web" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t3.micro"
+  subnet_id     = aws_subnet.pub-subnet-2.id
+  associate_public_ip_address = true 
+  key_name = aws_key_pair.keypair.key_name
+  vpc_security_group_ids = [aws_security_group.my-sg.id]
+
+  tags = {
+    Name = var.cidr_blocks[0].name
+  }
+}
+
+resource "aws_key_pair" "keypair" {
+  key_name   = "keypair"
+  public_key =  file(var.keypair-path)
+}
 
 data "aws_availability_zones" "available" {
   state = "available"
+}
+
+data "aws_ami" "ubuntu" {
+  most_recent = true
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  filter {
+    name = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-20230919"]
+  }
+
+  owners = ["099720109477"] 
+}
+
+output "ami-id" {
+    value = data.aws_ami.ubuntu
 }
 
 output "vpc-id" {
