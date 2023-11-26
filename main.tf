@@ -22,6 +22,8 @@ variable subnets_cidr_blocks {
     type = list 
 }
 
+variable private_key {}
+
 resource "aws_vpc" "my-vpc" {
     cidr_block = var.cidr_blocks[0].cidr_block 
     instance_tenancy = "default"
@@ -170,7 +172,30 @@ resource "aws_instance" "web" {
   associate_public_ip_address = true 
   key_name = aws_key_pair.keypair.key_name
   vpc_security_group_ids = [aws_security_group.my-sg.id]
-  user_data = file("entry.sh")
+  # user_data = file("entry.sh")
+  count = 1 
+
+  connection {
+    type = "ssh"
+    host = self.public_ip
+    user = "ubuntu"
+    private_key = file(var.private_key)
+  }
+
+  provisioner "file" {
+    source = "entry.sh" #absolute/relative path on local machine
+    destination = "/home/ubuntu/entry.sh" #absolute path on remote machine
+  }
+
+
+  provisioner "remote-exec" {
+    inline = [ "export ENV=dev", "mkdir Newdir", "chmod +x entry.sh", "./entry.sh"]
+    # script = file("entry.sh")
+  }
+
+  provisioner "local-exec" {
+    command = "echo ${self.public_ip} > ~/output.txt"
+  }
                 
   tags = {
     Name = var.cidr_blocks[0].name
