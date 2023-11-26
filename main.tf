@@ -170,7 +170,8 @@ resource "aws_instance" "web" {
   associate_public_ip_address = true 
   key_name = aws_key_pair.keypair.key_name
   vpc_security_group_ids = [aws_security_group.my-sg.id]
-
+  user_data = file("entry.sh")
+                
   tags = {
     Name = var.cidr_blocks[0].name
   }
@@ -227,6 +228,10 @@ output "pub-subnet2-id" {
 
 output "Azs" {
     value = data.aws_availability_zones.available.names
+}
+
+output "public_ip" {
+    value = aws_instance.web.public_ip
 }
 
 
